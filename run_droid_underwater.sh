@@ -31,6 +31,7 @@ python demo.py \
         --stride=1 \
         --weights="$model_weights_file" \
         --buffer=1024 \
-        --reconstruction_path="$results_folder/$output_filename"
+        --reconstruction_path="$results_folder/$output_filename"\
+	--disable_vis \
  
 exit 0
