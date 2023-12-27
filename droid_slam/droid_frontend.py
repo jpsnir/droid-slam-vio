@@ -120,20 +120,40 @@ class DroidFrontend:
             f"Tstamp of last frame {self.t1 - 1} : {self.video.tstamp[self.t1 -1].item()}"
         )
 
-        filename = f"fg_{self.count:04}_id_{int(self.video.tstamp[self.t1 -1].item()):04}.{format}"
-        factor_graph_data_dict = {
-            "id": self.video.tstamp[self.t1 - 1].cpu(),
-            "intrinsics": self.video.intrinsics[0].cpu(),
-            "graph_data": {
-                "ii": self.graph.ii_total.cpu(),
-                "jj": self.graph.jj_total.cpu(),
-            },
-            "disps": self.video.disps[: self.t1].cpu(),
-            "c_map": self.graph.weight_total.cpu(),
-            "predicted": self.graph.target_total.cpu(),
-            "poses": self.video.poses[: self.t1].cpu(),
-            "tstamp": self.video.tstamp[: self.t1].cpu(),
-        }
+        max_idx = self.graph.ii_total.max().item()
+        if max_idx == self.t1:
+            filename = f"fg_{self.count:04}_id_{int(self.video.tstamp[self.t1].item()):04}.{format}"
+            factor_graph_data_dict = {
+                "max_id": True,
+                "id": self.video.tstamp[self.t1].cpu(),
+                "intrinsics": self.video.intrinsics[0].cpu(),
+                "graph_data": {
+                    "ii": self.graph.ii_total.cpu(),
+                    "jj": self.graph.jj_total.cpu(),
+                },
+                "disps": self.video.disps[: self.t1].cpu(),
+                "c_map": self.graph.weight_total.cpu(),
+                "predicted": self.graph.target_total.cpu(),
+                "poses": self.video.poses[: self.t1 + 1].cpu(),
+                "tstamp": self.video.tstamp[: self.t1 + 1].cpu(),
+            }
+        else:
+            filename = f"fg_{self.count:04}_id_{int(self.video.tstamp[self.t1 - 1].item()):04}.{format}"
+            factor_graph_data_dict = {
+                "max_id": False,
+                "id": self.video.tstamp[self.t1 - 1].cpu(),
+                "intrinsics": self.video.intrinsics[0].cpu(),
+                "graph_data": {
+                    "ii": self.graph.ii_total.cpu(),
+                    "jj": self.graph.jj_total.cpu(),
+                },
+                "disps": self.video.disps[: self.t1].cpu(),
+                "c_map": self.graph.weight_total.cpu(),
+                "predicted": self.graph.target_total.cpu(),
+                "poses": self.video.poses[: self.t1].cpu(),
+                "tstamp": self.video.tstamp[: self.t1].cpu(),
+            }
+
         if format == "pt":
             data_container = torch.jit.script(
                 FactorGraphContainer(factor_graph_data_dict)
