@@ -131,7 +131,7 @@ class DroidFrontend:
                     "ii": self.graph.ii_total.cpu(),
                     "jj": self.graph.jj_total.cpu(),
                 },
-                "disps": self.video.disps[: self.t1].cpu(),
+                "disps": self.video.disps[: self.t1 + 1].cpu(),
                 "c_map": self.graph.weight_total.cpu(),
                 "predicted": self.graph.target_total.cpu(),
                 "poses": self.video.poses[: self.t1 + 1].cpu(),
