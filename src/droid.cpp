@@ -1,6 +1,30 @@
 #include <torch/extension.h>
 #include <vector>
 
+// stereo configuration
+
+struct Translation{
+	float x, y, z;
+};
+
+struct Quaternion{
+	float qx, qy ,qz, qw;
+};
+
+struct StereoTransform{
+	Translation t;
+	Quaternion q;
+};
+
+StereoTransform T_C0_C1 = {
+	.t = {-0.1, 0, 0},
+	.q = {0, 0, 0, 1}
+};
+
+//void set_stereo_transform(torch::Tensor T_01){
+//	T_C0.t = T_01
+//}
+
 // CUDA forward declarations
 std::vector<torch::Tensor> projective_transform_cuda(
   torch::Tensor poses,

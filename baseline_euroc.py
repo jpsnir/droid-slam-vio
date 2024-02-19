@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy.spatial.transform import Rotation 
 T_B_C0 = np.array([
      [0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975],
      [0.999557249008, 0.0149672133247, 0.025715529948, -0.064676986768],
@@ -14,7 +14,10 @@ T_B_C1 = np.array([
 ])
 
 
+# camera 1 wrt camera 0 ( camera 0 is treated as the left camera)
 T_C0_C1 = np.linalg.inv(T_B_C0)@T_B_C1
-print (T_C0_C1)
 
+print (T_C0_C1)
+r = Rotation.from_matrix(T_C0_C1[:3, :3])
 print(f"Baseline distance {np.linalg.norm(T_C0_C1[:3, 3])}")
+print(f"quaternion : {r.as_quat()}")
