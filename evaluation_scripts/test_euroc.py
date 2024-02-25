@@ -75,6 +75,27 @@ def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1):
 
         yield stride*t, images, intrinsics
 
+def save_reconstruction(droid, reconstruction_path):
+    from pathlib import Path
+    import random
+    import string
+
+    t = droid.video.counter.value
+    tstamps = droid.video.tstamp[:t].cpu().numpy()
+    images = droid.video.images[:t].cpu().numpy()
+    disps = droid.video.disps_up[:t].cpu().numpy()
+    poses = droid.video.poses[:t].cpu().numpy()
+    intrinsics = droid.video.intrinsics[:t].cpu().numpy()
+    print(f'poses size before interpolation: {poses.shape}')
+    Path("reconstructions/{}".format(reconstruction_path)).mkdir(
+        parents=True, exist_ok=True
+    )
+    np.save("reconstructions/{}/tstamps.npy".format(reconstruction_path), tstamps)
+    np.save("reconstructions/{}/images.npy".format(reconstruction_path), images)
+    np.save("reconstructions/{}/disps.npy".format(reconstruction_path), disps)
+    np.save("reconstructions/{}/poses.npy".format(reconstruction_path), poses)
+    np.save("reconstructions/{}/intrinsics.npy".format(reconstruction_path), intrinsics)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -98,8 +119,17 @@ if __name__ == '__main__':
     parser.add_argument("--backend_thresh", type=float, default=24.0)
     parser.add_argument("--backend_radius", type=int, default=2)
     parser.add_argument("--backend_nms", type=int, default=2)
-    args = parser.parse_args()
+    parser.add_argument("--upsample", action="store_true")
+    parser.add_argument("--reconstruction_path", help="path to saved reconstruction", default="./factor_graph_data")
+    parser.add_argument(
+        "-fg_fmt",
+        "--factor_graph_save_format",
+        type=str,
+        default="pkl",
+        help="format to save factor graph data",
+    )
 
+    args = parser.parse_args()
     torch.multiprocessing.set_start_method('spawn')
 
     print("Running evaluation on {}".format(args.datapath))
@@ -110,8 +140,10 @@ if __name__ == '__main__':
 
     for (t, image, intrinsics) in tqdm(image_stream(args.datapath, stereo=args.stereo, stride=2)):
         droid.track(t, image, intrinsics=intrinsics)
-
+    if args.reconstruction_path is not None:
+        save_reconstruction(droid, args.reconstruction_path)
     traj_est = droid.terminate(image_stream(args.datapath, stride=1))
+    print(f'poses shape after interpolation : {traj_est.shape}')
 
     ### run evaluation ###
 
