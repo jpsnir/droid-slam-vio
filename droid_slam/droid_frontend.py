@@ -43,14 +43,26 @@ class DroidFrontend:
         self.frontend_window = args.frontend_window
         self.frontend_thresh = args.frontend_thresh
         self.frontend_radius = args.frontend_radius
-        if args.reconstruction_path:
-            self.save_fg_path = Path(args.reconstruction_path).joinpath(
-                "factorgraph_data_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        
+        tag_stereo = ""
+        tag_upsample = ""
+        tag_basename = "factorgraph_data_"
+        
+        if args.stereo:
+            tag_stereo = "_stereo_"
+
+        if args.upsample:
+            tag_upsample = "_upsample_"
+        
+        self.save_fg_path = Path(args.reconstruction_path).joinpath(
+                     tag_basename + tag_stereo + tag_upsample + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
             )
 
-            self.save_fg_path.mkdir()
-            print(f"Factor graph save format - {args.factor_graph_save_format}")
-            self.save_fg_fmt = args.factor_graph_save_format
+
+        self.save_fg_path.mkdir(exist_ok=True,parents=True)
+        print(f"Factor graph save format - {args.factor_graph_save_format}")
+        
+        self.save_fg_fmt = args.factor_graph_save_format
 
     def __update(self):
         """add edges, perform update"""
@@ -117,7 +129,7 @@ class DroidFrontend:
         '''
         
 
-    def log_factor_graphs(self, format: str = "json"):
+    def log_factor_graphs(self, format: str = "pkl"):
         """
         log the factor graph data in binary or ascii format
         """
@@ -129,35 +141,27 @@ class DroidFrontend:
         max_idx = self.graph.ii_total.max().item()
         if max_idx == self.t1:
             filename = f"fg_{self.count:04}_id_{int(self.video.tstamp[self.t1].item()):04}.{format}"
-            factor_graph_data_dict = {
-                "max_id": True,
-                "id": self.video.tstamp[self.t1].cpu(),
-                "intrinsics": self.video.intrinsics[0].cpu(),
-                "graph_data": {
-                    "ii": self.graph.ii_total.cpu(),
-                    "jj": self.graph.jj_total.cpu(),
-                },
-                "disps": self.video.disps[: self.t1 + 1].cpu(),
-                "c_map": self.graph.weight_total.cpu(),
-                "predicted": self.graph.target_total.cpu(),
-                "poses": self.video.poses[: self.t1 + 1].cpu(),
-                "tstamp": self.video.tstamp[: self.t1 + 1].cpu(),
-            }
+            t = self.t1  
         else:
             filename = f"fg_{self.count:04}_id_{int(self.video.tstamp[self.t1 - 1].item()):04}.{format}"
-            factor_graph_data_dict = {
+            t = self.t1 - 1
+        
+
+        factor_graph_data_dict = {
                 "max_id": False,
-                "id": self.video.tstamp[self.t1 - 1].cpu(),
+                "id": self.video.tstamp[t].cpu(),
                 "intrinsics": self.video.intrinsics[0].cpu(),
                 "graph_data": {
                     "ii": self.graph.ii_total.cpu(),
                     "jj": self.graph.jj_total.cpu(),
                 },
-                "disps": self.video.disps[: self.t1].cpu(),
+                "disps": self.video.disps[: t + 1].cpu(),
+                "disps_sens": self.video.disps_sens[: t  + 1].cpu(),
+                "disps_up": self.video.disps_up[: t + 1].cpu(),
                 "c_map": self.graph.weight_total.cpu(),
                 "predicted": self.graph.target_total.cpu(),
-                "poses": self.video.poses[: self.t1].cpu(),
-                "tstamp": self.video.tstamp[: self.t1].cpu(),
+                "poses": self.video.poses[: t + 1].cpu(),
+                "tstamp": self.video.tstamp[: t + 1].cpu(),
             }
 
         if format == "pt":
