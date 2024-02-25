@@ -10,6 +10,8 @@ from droid_net import cvx_upsample
 import geom.projective_ops as pops
 import sys
 import csv
+from pathlib import Path
+import os
 
 
 class DepthVideo:
@@ -107,7 +109,7 @@ class DepthVideo:
         self.timestamp_csv.append([index, self.tstamp[index].item()])
         if len(self.timestamp_csv) % 10 == 0:
             with open(
-                "/home/goku/workspaces/NEUFR/vins/droid_slam_vio/time_log.csv",
+                Path(os.environ["HOME"]).joinpath("workspaces/NEUFR/vins/droid-slam-vio/time_log.csv"),
                 "a",
                 newline="",
             ) as f:

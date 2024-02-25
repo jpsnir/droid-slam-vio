@@ -110,6 +110,12 @@ class DroidFrontend:
 
         # update visualization
         self.video.dirty[self.graph.ii.min() : self.t1] = True
+    
+    def log_factor_graphs_stereo(self):
+        '''
+        logs the factor graph of stereo data.
+        '''
+        
 
     def log_factor_graphs(self, format: str = "json"):
         """
