@@ -42,9 +42,9 @@ class DepthVideo:
         self.disps_sens = torch.zeros(
             buffer, ht // 8, wd // 8, device="cuda", dtype=torch.float
         ).share_memory_()
-        # self.disps_up = torch.zeros(
-        #     buffer, ht, wd, device="cuda", dtype=torch.float
-        # ).share_memory_()
+        self.disps_up = torch.zeros(
+            buffer, ht, wd, device="cuda", dtype=torch.float
+        ).share_memory_()
         self.intrinsics = torch.zeros(
             buffer, 4, device="cuda", dtype=torch.float
         ).share_memory_()
@@ -106,19 +106,19 @@ class DepthVideo:
         if len(item) > 8:
             self.inps[index] = item[8]
 
-        self.timestamp_csv.append([index, self.tstamp[index].item()])
-        if len(self.timestamp_csv) % 10 == 0:
-            with open(
-                Path(os.environ["HOME"]).joinpath("workspaces/NEUFR/vins/droid-slam-vio/time_log.csv"),
-                "a",
-                newline="",
-            ) as f:
-                self.filewriter = csv.writer(
-                    f, delimiter=",", quoting=csv.QUOTE_MINIMAL
-                )
-                self.filewriter.writerows(self.timestamp_csv)
-                self.timestamp_csv = []
-                f.close()
+        # self.timestamp_csv.append([index, self.tstamp[index].item()])
+        # if len(self.timestamp_csv) % 10 == 0:
+        #     with open(
+        #         Path(os.environ["HOME"]).joinpath("workspaces/NEUFR/vins/droid-slam-vio/time_log.csv"),
+        #         "a",
+        #         newline="",
+        #     ) as f:
+        #         self.filewriter = csv.writer(
+        #             f, delimiter=",", quoting=csv.QUOTE_MINIMAL
+        #         )
+        #         self.filewriter.writerows(self.timestamp_csv)
+        #         self.timestamp_csv = []
+        #         f.close()
 
     def __setitem__(self, index, item):
         with self.get_lock():
