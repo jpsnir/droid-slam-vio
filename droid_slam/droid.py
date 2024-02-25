@@ -40,6 +40,7 @@ class Droid:
 
         # post processor - fill in poses for non-keyframes
         self.traj_filler = PoseTrajectoryFiller(self.net, self.video)
+        self.global_ba = args.global_ba
 
 
     def load_weights(self, weights):
@@ -69,20 +70,22 @@ class Droid:
             self.frontend()
 
             # global bundle adjustment
-            # self.backend()
+            if self.global_ba:
+                self.backend()
 
     def terminate(self, stream=None):
         """ terminate the visualization process, return poses [t, q] """
 
         del self.frontend
 
-        torch.cuda.empty_cache()
-        print("#" * 32)
-        self.backend(7)
+        if self.global_ba:
+            torch.cuda.empty_cache()
+            print("#" * 32)
+            self.backend(7)
 
-        torch.cuda.empty_cache()
-        print("#" * 32)
-        self.backend(12)
+            torch.cuda.empty_cache()
+            print("#" * 32)
+            self.backend(12)
 
         camera_trajectory = self.traj_filler(stream)
         return camera_trajectory.inv().data.cpu().numpy()
