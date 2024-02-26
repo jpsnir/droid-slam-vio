@@ -7,7 +7,7 @@ from factor_graph import FactorGraph
 from pathlib import Path
 from datetime import datetime
 import pickle
-
+import os
 
 class FactorGraphContainer(torch.nn.Module):
     def __init__(self, values_dict):
@@ -43,26 +43,27 @@ class DroidFrontend:
         self.frontend_window = args.frontend_window
         self.frontend_thresh = args.frontend_thresh
         self.frontend_radius = args.frontend_radius
-        
-        tag_stereo = ""
-        tag_upsample = ""
-        tag_basename = "factorgraph_data_"
-        
-        if args.stereo:
-            tag_stereo = "_stereo_"
 
-        if args.upsample:
-            tag_upsample = "_upsample_"
-        
-        self.save_fg_path = Path(args.reconstruction_path).joinpath(
-                     tag_basename + tag_stereo + tag_upsample + datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-            )
+        # factor graph store
+        self.save_configuration_factor_graph_data(args)
+
+
+    def save_configuration_factor_graph_data(self, args):
+        """
+        save the configuration data for file and folder locations of the factor graph data
+        """
+
+        dataset_name = args.dataset_name    
+        reconstruction_path = args.reconstruction_path
+
+        self.save_fg_path = Path(f'{args.reconstruction_path}').joinpath(
+            dataset_name, f"factor_graphs",args.camera_name,args.date_time)
 
 
         self.save_fg_path.mkdir(exist_ok=True,parents=True)
         print(f"Factor graph save format - {args.factor_graph_save_format}")
         
-        self.save_fg_fmt = args.factor_graph_save_format
+        self.save_fg_fmt = args.factor_graph_save_format    
 
     def __update(self):
         """add edges, perform update"""
@@ -122,12 +123,6 @@ class DroidFrontend:
 
         # update visualization
         self.video.dirty[self.graph.ii.min() : self.t1] = True
-    
-    def log_factor_graphs_stereo(self):
-        '''
-        logs the factor graph of stereo data.
-        '''
-        
 
     def log_factor_graphs(self, format: str = "pkl"):
         """
@@ -157,7 +152,6 @@ class DroidFrontend:
                 },
                 "disps": self.video.disps[: t + 1].cpu(),
                 "disps_sens": self.video.disps_sens[: t  + 1].cpu(),
-                "disps_up": self.video.disps_up[: t + 1].cpu(),
                 "c_map": self.graph.weight_total.cpu(),
                 "predicted": self.graph.target_total.cpu(),
                 "poses": self.video.poses[: t + 1].cpu(),

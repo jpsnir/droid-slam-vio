@@ -70,8 +70,8 @@ class Droid:
             self.frontend()
 
             # global bundle adjustment
-            if self.global_ba:
-                self.backend()
+            # if self.global_ba:
+            #     self.backend()
 
     def terminate(self, stream=None):
         """ terminate the visualization process, return poses [t, q] """

@@ -13,9 +13,9 @@ import argparse
 
 from torch.multiprocessing import Process
 from droid import Droid
-
+from datetime import datetime
 import torch.nn.functional as F
-
+from pathlib import Path
 
 
 def show_image(image):
@@ -75,10 +75,15 @@ def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1):
 
         yield stride*t, images, intrinsics
 
-def save_reconstruction(droid, reconstruction_path, camera_name:str = 'mono', dataset_name:str = ''):
+def save_reconstruction(droid, args):
     from pathlib import Path
     import random
     import string
+
+    date_time = args.date_time
+    reconstruction_path = args.reconstruction_path
+    dataset_name = args.dataset_name
+    camera_name = args.camera_name
 
     t = droid.video.counter.value
     tstamps = droid.video.tstamp[:t].cpu().numpy()
@@ -87,7 +92,9 @@ def save_reconstruction(droid, reconstruction_path, camera_name:str = 'mono', da
     poses = droid.video.poses[:t].cpu().numpy()
     intrinsics = droid.video.intrinsics[:t].cpu().numpy()
     print(f'poses size before interpolation: {poses.shape}')
-    recon_save_path = Path(f"{reconstruction_path}/reconstructions/{dataset_name}/{camera_name}")
+    
+    recon_save_path = Path(f"{reconstruction_path}").joinpath(
+         dataset_name,"reconstructions",camera_name,date_time)
     recon_save_path.mkdir(parents=True, exist_ok=True)
     np.save(recon_save_path.joinpath("tstamps.npy").as_posix(), tstamps)
     np.save(recon_save_path.joinpath("images.npy").as_posix(), images)
@@ -130,21 +137,28 @@ if __name__ == '__main__':
     )
 
     args = parser.parse_args()
-    torch.multiprocessing.set_start_method('spawn')
-
+    args.date_time = f"{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}"
+    args.dataset_name = os.path.basename(args.datapath)
+    if args.stereo:
+            args.camera_name = 'stereo'
+    else:
+            args.camera_name = 'mono'
+    if args.global_ba:
+         args.ba_tag = "gba"
+    else:
+         args.ba_tag = "lba"
+    
+    # processing starts
     print("Running evaluation on {}".format(args.datapath))
-    dataset_name = os.path.basename(args.datapath)
-    print(args)
-
+    torch.multiprocessing.set_start_method('spawn')
     droid = Droid(args)
     time.sleep(5)
+    
 
     for (t, image, intrinsics) in tqdm(image_stream(args.datapath, stereo=args.stereo, stride=2)):
         droid.track(t, image, intrinsics=intrinsics)
-    if args.reconstruction_path is not None:
-        if args.stereo:
-            camera_name = 'stereo'
-        save_reconstruction(droid, args.reconstruction_path, camera_name=camera_name, dataset_name=dataset_name)
+
+    save_reconstruction(droid, args)
     traj_est = droid.terminate(image_stream(args.datapath, stride=1))
     print(f'poses shape after interpolation : {traj_est.shape}')
 
@@ -171,7 +185,16 @@ if __name__ == '__main__':
 
     result = main_ape.ape(traj_ref, traj_est, est_name='traj', 
         pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
-
     print(result)
+    print(type(result))
+
+    p = Path(args.reconstruction_path).joinpath(args.dataset_name,"evo", args.camera_name, args.date_time)
+    p.mkdir(parents=True, exist_ok=True)
+    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_ref_{args.ba_tag}.txt").as_posix(), traj_ref)
+    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_{args.ba_tag}.txt").as_posix(), traj_est)
+
+    with open(p.joinpath(f"ape_result_{args.ba_tag}.txt").as_posix(), 'w') as f:
+        f.write(str(result))
+    
 
 
