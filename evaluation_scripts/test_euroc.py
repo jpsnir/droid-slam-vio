@@ -127,7 +127,7 @@ if __name__ == '__main__':
     parser.add_argument("--backend_nms", type=int, default=2)
     parser.add_argument("--upsample", action="store_true")
     parser.add_argument("--reconstruction_path", help="path to saved reconstruction", default=".")
-    parser.add_argument("--global_ba", action="store_true")
+    parser.add_argument("--global_ba", action="store_true", help="flag to perform global BA at the end.")
     parser.add_argument(
         "-fg_fmt",
         "--factor_graph_save_format",
