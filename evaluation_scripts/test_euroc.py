@@ -22,6 +22,7 @@ logging.basicConfig(
      format='%(asctime)s:%(levelname)s:%(funcName)s:%(lineno)s:%(message)s'
 )
 NANOSEC_TO_SEC = 1e-9
+SEC_TO_NANOSEC = 1e9
 
 def show_image(image):
     image = image.permute(1, 2, 0).cpu().numpy()
@@ -112,6 +113,141 @@ def save_reconstruction(droid, args):
     np.save(recon_save_path.joinpath("intrinsics.npy").as_posix(), intrinsics)
     logging.info(f"Saved reconstruction at {recon_save_path.as_posix()}")
 
+def evaluate_trajectory(timestamps:dict, poses: dict, args) -> None:
+    """ evaluation of trajectory and saving the results"""
+    ### run evaluation ###
+    import evo
+    from evo.core.trajectory import PoseTrajectory3D
+    from evo.tools import file_interface
+    from evo.core import sync
+    import evo.main_ape as main_ape
+    from evo.core.metrics import PoseRelation
+    poses_no_interpolation = poses['no_ip']
+    poses_no_interpolation_inverted = poses['no_ip_inv']
+    traj_est = poses['ip']
+    tstamps_no_ip_seconds = timestamps['t_no_ip_s']
+    tstamps_ns = timestamps['t_ip_ns']
+
+    traj_est_no_interpolation = PoseTrajectory3D(
+         positions_xyz = poses_no_interpolation[:, :3],
+         orientations_quat_wxyz = poses_no_interpolation[:, 3:],
+         timestamps = tstamps_no_ip_seconds,
+    )
+    traj_est_no_interpolation_inverted = PoseTrajectory3D(
+         positions_xyz = poses_no_interpolation_inverted[:, :3],
+         orientations_quat_wxyz = poses_no_interpolation_inverted[:, 3:],
+         timestamps = tstamps_no_ip_seconds,
+    )    
+    traj_est_no_interpolation_inverted = PoseTrajectory3D(
+         positions_xyz = poses_no_interpolation_inverted[:, :3],
+         orientations_quat_wxyz = poses_no_interpolation_inverted[:, 3:],
+         timestamps = tstamps_no_ip_seconds,
+    )
+    traj_est_prescaled = PoseTrajectory3D(
+        positions_xyz=1.10 * traj_est[:,:3],
+        orientations_quat_wxyz=traj_est[:,3:],
+        timestamps=np.array(tstamps_ns))
+    
+    traj_est_unscaled_ip = PoseTrajectory3D(
+        positions_xyz = traj_est[:,:3],
+        orientations_quat_wxyz=traj_est[:,3:],
+        timestamps=np.array(tstamps_ns))
+    
+    traj_est_ip_unscaled_seconds = PoseTrajectory3D(
+        positions_xyz = traj_est[:,:3],
+        orientations_quat_wxyz=traj_est[:,3:],
+        timestamps=np.array(tstamps_ns)*NANOSEC_TO_SEC)
+    
+    traj_est_no_ip_unscaled_ns = PoseTrajectory3D(
+        positions_xyz = poses_no_interpolation_inverted[:,:3],
+        orientations_quat_wxyz=poses_no_interpolation_inverted[:,3:],
+        timestamps=tstamps_no_ip_seconds*SEC_TO_NANOSEC)
+
+    # reading filestraj_est_unscaled_ip
+    traj_ref = file_interface.read_tum_trajectory_file(args.gt)
+    
+    if args.stereo:
+        logging.info("Stereo trajectory alignment and ape error computations")
+        logging.debug("APE error for unscaled stereo trajectory")
+        traj_ref = file_interface.read_tum_trajectory_file(args.gt)
+        traj_ref, traj_est_unscaled = sync.associate_trajectories(traj_ref, traj_est_unscaled_ip)
+        result_ip = main_ape.ape(traj_ref, traj_est_unscaled, est_name='traj', 
+            pose_relation=PoseRelation.translation_part, align=True, correct_scale=False)
+        
+        logging.debug("APE error for unscaled and not - interpolated stereo trajectory")
+        traj_ref = file_interface.read_tum_trajectory_file(args.gt)
+        traj_ref, traj_est_no_ip_unscaled = sync.associate_trajectories(traj_ref, traj_est_no_ip_unscaled_ns)
+        result_no_ip = main_ape.ape(traj_ref, traj_est_no_ip_unscaled, est_name='traj', 
+            pose_relation=PoseRelation.translation_part, align=True, correct_scale=False)
+        
+        logging.info(f"EVO alignment and trajectory evaluation \n STEREO - UNSCALED INTERPOLATED \n {result_ip}")
+        logging.info(f"EVO alignment and trajectory evaluation \n STEREO - UNSCALED NOT INTERPOLATED \n {result_no_ip}")
+    else:
+        logging.info("Mono Trajectory alignment and ape error computation")
+        logging.debug("Computing APE error for prescaled trajectory")
+        traj_ref = file_interface.read_tum_trajectory_file(args.gt)
+        traj_ref, traj_est_prescaled = sync.associate_trajectories(traj_ref, traj_est_prescaled)
+        result_scaled_before = main_ape.ape(traj_ref, traj_est_prescaled, est_name='traj', 
+            pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
+        
+        # unscaled trajectory
+        logging.debug("Computing APE error for unscaled trajectory")
+        traj_ref = file_interface.read_tum_trajectory_file(args.gt)
+        traj_ref, traj_est_unscaled = sync.associate_trajectories(traj_ref, traj_est_unscaled_ip)
+        result_unscaled_before = main_ape.ape(traj_ref, traj_est_unscaled, est_name='traj', 
+            pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
+        
+        # not interpolated and unscaled
+        logging.debug("Computing APE error for not interpolated and not prescaled trajectory")
+        traj_ref = file_interface.read_tum_trajectory_file(args.gt)
+        traj_ref, traj_est_no_ip_unscaled = sync.associate_trajectories(traj_ref, traj_est_no_ip_unscaled_ns)
+        result_no_ip_unscaled = main_ape.ape(traj_ref, traj_est_no_ip_unscaled, est_name='traj', 
+            pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
+        
+        
+        logging.info(f'EVO alignment and trajectory evaluation \n  MONO - INTERPOLATED PRESCALED: \n {result_scaled_before}')
+        logging.info(f'EVO alignment and trajectory evaluation \n  MONO - INTERPOLATED UNSCALED : \n {result_unscaled_before}')
+        logging.info(f"EVO alignment and trajectory evaluation \n  MONO -  NO INTERPOLATION - UNSCALED: \n {result_no_ip_unscaled}")
+
+    p = Path(args.reconstruction_path).joinpath(args.dataset_name,"evo", args.camera_name)
+    p.mkdir(parents=True, exist_ok=True)
+    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_ref_{args.ba_tag}.txt").as_posix(), traj_ref)
+    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_no_ip_inv_{args.ba_tag}.txt").as_posix(), traj_est_no_interpolation_inverted)
+    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_no_ip_{args.ba_tag}.txt").as_posix(), traj_est_no_interpolation)
+    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_ip_no_prescale_{args.ba_tag}.txt").as_posix(), traj_est_ip_unscaled_seconds)
+    
+    if args.stereo:
+        file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_{args.ba_tag}.txt").as_posix(), traj_est_unscaled)
+        with open(p.joinpath(f"ape_result_ip_no_prescale_{args.ba_tag}.txt").as_posix(), 'w') as f:
+            f.write(str(result_ip))
+        with open(p.joinpath(f"ape_result_no_ip_no_prescale_{args.ba_tag}.txt").as_posix(), 'w') as f:
+            f.write(str(result_no_ip))
+    else:     
+        file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_prescale_{args.ba_tag}.txt").as_posix(), traj_est_prescaled)
+        file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_no_prescale_{args.ba_tag}.txt").as_posix(), traj_est_unscaled)
+        with open(p.joinpath(f"ape_result_prescale_{args.ba_tag}.txt").as_posix(), 'w') as f:
+            f.write(str(result_scaled_before))
+        with open(p.joinpath(f"ape_result_no_prescale_{args.ba_tag}.txt").as_posix(), 'w') as f:
+            f.write(str(result_unscaled_before))
+        
+        with open(p.joinpath(f"ape_result_no_ip_no_prescale_{args.ba_tag}.txt").as_posix(), 'w') as f:
+            f.write(str(result_no_ip_unscaled))
+    
+    # save umeyama alignment results.
+    logging.info("saving Umeyama alignment results")
+    traj_ref, traj_est_unscaled = sync.associate_trajectories(traj_ref, traj_est_unscaled_ip)
+    r_a_um, t_a_um, s_um = traj_est_unscaled.align(traj_ref, correct_scale = True)
+    with open(p.joinpath(f"umeyama_alignment_ip_{args.ba_tag}.txt").as_posix(), 'w') as f:
+        f.write(f"Rotation : \n {r_a_um}\n")
+        f.write(f"Translation : \n {t_a_um}\n")
+        f.write(f"Scale : \n {s_um}\n")
+    
+    traj_ref, traj_est_no_ip_unscaled = sync.associate_trajectories(traj_ref, traj_est_no_ip_unscaled_ns)
+    r_a_um, t_a_um, s_um = traj_est_no_ip_unscaled.align(traj_ref, correct_scale = True)
+    with open(p.joinpath(f"umeyama_alignment_no_ip_{args.ba_tag}.txt").as_posix(), 'w') as f:
+        f.write(f"Rotation : \n {r_a_um}\n")
+        f.write(f"Translation : \n {t_a_um}\n")
+        f.write(f"Scale : \n {s_um}\n")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -186,50 +322,16 @@ if __name__ == '__main__':
     # terminate fills the trajectory by interpolating at intermediate timestamps.
     traj_est = droid.terminate(image_stream(args.datapath, stride=1))
     logging.debug(f'poses shape after interpolation : {traj_est.shape}')
+    poses = {'no_ip': poses_no_interpolation,
+             'no_ip_inv': poses_no_interpolation_inverted,
+             'ip':traj_est
+    }
+    timestamps = {"t_no_ip_s": tstamps_no_ip_seconds,
+                  "t_ip_ns": tstamps_ns
+    }
+    evaluate_trajectory(timestamps, poses, args)
 
-    ### run evaluation ###
-    import evo
-    from evo.core.trajectory import PoseTrajectory3D
-    from evo.tools import file_interface
-    from evo.core import sync
-    import evo.main_ape as main_ape
-    from evo.core.metrics import PoseRelation
-
-    traj_est_no_interpolation = PoseTrajectory3D(
-         positions_xyz = poses_no_interpolation[:, :3],
-         orientations_quat_wxyz = poses_no_interpolation[:, 3:],
-         timestamps = tstamps_no_ip_seconds,
-    )
-    traj_est_no_interpolation_inverted = PoseTrajectory3D(
-         positions_xyz = poses_no_interpolation_inverted[:, :3],
-         orientations_quat_wxyz = poses_no_interpolation_inverted[:, 3:],
-         timestamps = tstamps_no_ip_seconds,
-    )
     
-    breakpoint()
-    
-    traj_est = PoseTrajectory3D(
-        positions_xyz=1.10 * traj_est[:,:3],
-        orientations_quat_wxyz=traj_est[:,3:],
-        timestamps=np.array(tstamps))
-
-    traj_ref = file_interface.read_tum_trajectory_file(args.gt)
-
-    traj_ref, traj_est = sync.associate_trajectories(traj_ref, traj_est)
-
-    result = main_ape.ape(traj_ref, traj_est, est_name='traj', 
-        pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
-    print(result)
-
-    p = Path(args.reconstruction_path).joinpath(args.dataset_name,"evo", args.camera_name, args.date_time)
-    p.mkdir(parents=True, exist_ok=True)
-    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_ref_{args.ba_tag}.txt").as_posix(), traj_ref)
-    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_no_ip_inv_{args.ba_tag}.txt").as_posix(), traj_est_no_interpolation_inverted)
-    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_no_ip_{args.ba_tag}.txt").as_posix(), traj_est_no_interpolation)
-    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_{args.ba_tag}.txt").as_posix(), traj_est)
-
-    with open(p.joinpath(f"ape_result_{args.ba_tag}.txt").as_posix(), 'w') as f:
-        f.write(str(result))
     
 
 
