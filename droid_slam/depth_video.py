@@ -245,7 +245,7 @@ class DepthVideo:
             if t1 is None:
                 t1 = max(ii.max().item(), jj.max().item()) + 1
 
-            print(f"Bundle adjustment of factor graphs between frame - {t0} and {t1}")
+            print(f"Bundle adjustment of factor graphs between frame - {ii.min().item()} and {t1}")
             droid_backends.ba(
                 self.poses,
                 self.disps,

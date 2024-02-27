@@ -16,7 +16,12 @@ from droid import Droid
 from datetime import datetime
 import torch.nn.functional as F
 from pathlib import Path
-
+import logging
+logging.basicConfig(
+     level=logging.DEBUG,
+     format='%(asctime)s:%(levelname)s:%(funcName)s:%(lineno)s:%(message)s'
+)
+NANOSEC_TO_SEC = 1e-9
 
 def show_image(image):
     image = image.permute(1, 2, 0).cpu().numpy()
@@ -86,7 +91,10 @@ def save_reconstruction(droid, args):
     camera_name = args.camera_name
 
     t = droid.video.counter.value
-    tstamps = droid.video.tstamp[:t].cpu().numpy()
+    images_list = sorted(glob.glob(os.path.join(args.datapath, 'mav0/cam0/data/*.png')))
+    tstamps = [float(x.split('/')[-1][:-4]) for x in images_list]
+    image_ids = droid.video.tstamp[:t].cpu().numpy()
+    tstamps = np.take(tstamps, image_ids.astype(int).tolist())
     images = droid.video.images[:t].cpu().numpy()
     disps = droid.video.disps_up[:t].cpu().numpy()
     poses = droid.video.poses[:t].cpu().numpy()
@@ -94,13 +102,15 @@ def save_reconstruction(droid, args):
     print(f'poses size before interpolation: {poses.shape}')
     
     recon_save_path = Path(f"{reconstruction_path}").joinpath(
-         dataset_name,"reconstructions",camera_name,date_time)
+         dataset_name,"reconstructions",camera_name)
     recon_save_path.mkdir(parents=True, exist_ok=True)
+    np.save(recon_save_path.joinpath("image_ids.npy").as_posix(), image_ids)
     np.save(recon_save_path.joinpath("tstamps.npy").as_posix(), tstamps)
     np.save(recon_save_path.joinpath("images.npy").as_posix(), images)
     np.save(recon_save_path.joinpath("disps.npy").as_posix(), disps)
     np.save(recon_save_path.joinpath("poses.npy").as_posix(), poses)
     np.save(recon_save_path.joinpath("intrinsics.npy").as_posix(), intrinsics)
+    logging.info(f"Saved reconstruction at {recon_save_path.as_posix()}")
 
 
 if __name__ == '__main__':
@@ -149,7 +159,7 @@ if __name__ == '__main__':
          args.ba_tag = "lba"
     
     # processing starts
-    print("Running evaluation on {}".format(args.datapath))
+    logging.info(f"Running evaluation on {args.datapath}")
     torch.multiprocessing.set_start_method('spawn')
     droid = Droid(args)
     time.sleep(5)
@@ -159,11 +169,25 @@ if __name__ == '__main__':
         droid.track(t, image, intrinsics=intrinsics)
 
     save_reconstruction(droid, args)
+    
+    images_list = sorted(glob.glob(os.path.join(args.datapath, 'mav0/cam0/data/*.png')))
+    # these timestamps are in nanoseconds
+    tstamps_ns = [float(x.split('/')[-1][:-4]) for x in images_list]
+
+    # data for trajectory without interpolation
+    n = droid.video.counter.value
+    image_ids = droid.video.tstamp[:n].cpu().numpy()
+    tstamps_no_ip_seconds = np.take(
+         tstamps_ns, image_ids.astype(int).tolist())*NANOSEC_TO_SEC
+    poses_se3 = lietorch.SE3(droid.video.poses[:n])
+    poses_no_interpolation_inverted = poses_se3.inv().data.cpu().numpy()
+    poses_no_interpolation = poses_se3.data.cpu().numpy()
+
+    # terminate fills the trajectory by interpolating at intermediate timestamps.
     traj_est = droid.terminate(image_stream(args.datapath, stride=1))
-    print(f'poses shape after interpolation : {traj_est.shape}')
+    logging.debug(f'poses shape after interpolation : {traj_est.shape}')
 
     ### run evaluation ###
-
     import evo
     from evo.core.trajectory import PoseTrajectory3D
     from evo.tools import file_interface
@@ -171,9 +195,19 @@ if __name__ == '__main__':
     import evo.main_ape as main_ape
     from evo.core.metrics import PoseRelation
 
-    images_list = sorted(glob.glob(os.path.join(args.datapath, 'mav0/cam0/data/*.png')))
-    tstamps = [float(x.split('/')[-1][:-4]) for x in images_list]
-
+    traj_est_no_interpolation = PoseTrajectory3D(
+         positions_xyz = poses_no_interpolation[:, :3],
+         orientations_quat_wxyz = poses_no_interpolation[:, 3:],
+         timestamps = tstamps_no_ip_seconds,
+    )
+    traj_est_no_interpolation_inverted = PoseTrajectory3D(
+         positions_xyz = poses_no_interpolation_inverted[:, :3],
+         orientations_quat_wxyz = poses_no_interpolation_inverted[:, 3:],
+         timestamps = tstamps_no_ip_seconds,
+    )
+    
+    breakpoint()
+    
     traj_est = PoseTrajectory3D(
         positions_xyz=1.10 * traj_est[:,:3],
         orientations_quat_wxyz=traj_est[:,3:],
@@ -186,11 +220,12 @@ if __name__ == '__main__':
     result = main_ape.ape(traj_ref, traj_est, est_name='traj', 
         pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
     print(result)
-    print(type(result))
 
     p = Path(args.reconstruction_path).joinpath(args.dataset_name,"evo", args.camera_name, args.date_time)
     p.mkdir(parents=True, exist_ok=True)
     file_interface.write_tum_trajectory_file(p.joinpath(f"traj_ref_{args.ba_tag}.txt").as_posix(), traj_ref)
+    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_no_ip_inv_{args.ba_tag}.txt").as_posix(), traj_est_no_interpolation_inverted)
+    file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_no_ip_{args.ba_tag}.txt").as_posix(), traj_est_no_interpolation)
     file_interface.write_tum_trajectory_file(p.joinpath(f"traj_est_{args.ba_tag}.txt").as_posix(), traj_est)
 
     with open(p.joinpath(f"ape_result_{args.ba_tag}.txt").as_posix(), 'w') as f:

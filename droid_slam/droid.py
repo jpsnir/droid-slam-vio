@@ -74,8 +74,9 @@ class Droid:
             #     self.backend()
 
     def terminate(self, stream=None):
-        """ terminate the visualization process, return poses [t, q] """
-
+        """ terminate the visualization process, return poses [t, q] 
+            fills in poses for all camera frames. 
+        """
         del self.frontend
 
         if self.global_ba:
@@ -87,6 +88,11 @@ class Droid:
             print("#" * 32)
             self.backend(12)
 
+        # camera trajectory is an SE(3) pose type. 
         camera_trajectory = self.traj_filler(stream)
+        print(f'camera_trajectory type {camera_trajectory}')
+        print(f'shape : {camera_trajectory.shape}')
+        # breakpoint()
+        # note that there is an inverse taken. 
         return camera_trajectory.inv().data.cpu().numpy()
 

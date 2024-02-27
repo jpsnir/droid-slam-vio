@@ -56,7 +56,6 @@ class PoseTrajectoryFiller:
         v = dP.log() / dt.unsqueeze(-1)
         w = v * (tt - ts[t0]).unsqueeze(-1)
         Gs = SE3.exp(w) * Ps[t0]
-
         # extract features (no need for context features)
         inputs = inputs.sub_(self.MEAN).div_(self.STDV)
         fmap = self.__feature_encoder(inputs)

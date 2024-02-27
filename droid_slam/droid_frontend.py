@@ -56,8 +56,9 @@ class DroidFrontend:
         dataset_name = args.dataset_name    
         reconstruction_path = args.reconstruction_path
 
-        self.save_fg_path = Path(f'{args.reconstruction_path}').joinpath(
-            dataset_name, f"factor_graphs",args.camera_name,args.date_time)
+        self.save_fg_path = Path(
+            args.reconstruction_path).joinpath(
+                dataset_name, f"factor_graphs",args.camera_name)
 
 
         self.save_fg_path.mkdir(exist_ok=True,parents=True)
