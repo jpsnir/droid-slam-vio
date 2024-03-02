@@ -4,7 +4,7 @@
 EUROC_PATH=/data/jagat/euroc/
 
 evalset=(
-    MH_01_easy
+   MH_01_easy
    MH_02_easy
    MH_03_medium
    MH_04_difficult
@@ -17,12 +17,20 @@ evalset=(
     V2_03_difficult
 )
 
+
 for seq in ${evalset[@]}; do
     python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --weights=droid.pth --disable_vis $@
 done
 
+for seq in ${evalset[@]}; do
+    python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --weights=droid.pth --disable_vis  --global_ba $@
+done
 
 
 for seq in ${evalset[@]}; do
     python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --stereo --weights=droid.pth --disable_vis $@
+done
+
+for seq in ${evalset[@]}; do
+    python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --stereo --weights=droid.pth --disable_vis --global_ba $@
 done
