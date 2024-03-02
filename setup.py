@@ -6,6 +6,7 @@ ROOT = osp.dirname(osp.abspath(__file__))
 
 setup(
     name='droid_backends',
+    version='0.1',
     ext_modules=[
         CUDAExtension('droid_backends',
             include_dirs=[osp.join(ROOT, 'thirdparty/eigen')],
