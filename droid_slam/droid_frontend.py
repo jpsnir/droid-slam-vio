@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime
 import pickle
 import os
+import logging
 
 class FactorGraphContainer(torch.nn.Module):
     def __init__(self, values_dict):
@@ -21,7 +22,7 @@ class DroidFrontend:
         self.video = video
         self.update_op = net.update
         self.graph = FactorGraph(
-            video, net.update, max_factors=48, upsample=args.upsample
+            video, net.update, max_factors=args.max_factors, upsample=args.upsample
         )
 
         # local optimization window
@@ -32,7 +33,7 @@ class DroidFrontend:
         self.is_initialized = False
         self.count = 0
 
-        self.max_age = 25
+        self.max_age = args.max_age
         self.iters1 = 4
         self.iters2 = 2
 
@@ -104,8 +105,7 @@ class DroidFrontend:
 
         if d.item() < self.keyframe_thresh:
             self.graph.rm_keyframe(self.t1 - 2)
-            print(
-                f"DROID FRONTEND - removing keyframe {self.t1 -2}, motion - {d.item()} less \
+            logging.info(f"DROID FRONTEND - removing keyframe {self.t1 -2}, motion - {d.item()} less \
                     than threshold {self.keyframe_thresh}"
             )
             with self.video.get_lock():
@@ -116,7 +116,9 @@ class DroidFrontend:
             for itr in range(self.iters2):
                 print(f"DROID FRONTEND update iteration - phase2 - {itr}")
                 self.graph.update(None, None, use_inactive=True)
-
+        
+        logging.info(f'age = {self.graph.age}')
+        logging.info(f"length of nodes = ii- {self.graph.ii[0]} - jj-{self.graph.jj[0]}")
         self.log_factor_graphs(format=self.save_fg_fmt)
         # set pose for next itration
         self.video.poses[self.t1] = self.video.poses[self.t1 - 1]
