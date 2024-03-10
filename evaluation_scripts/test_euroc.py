@@ -274,15 +274,20 @@ if __name__ == '__main__':
     parser.add_argument("--image_size", default=[320,512])
     parser.add_argument("--disable_vis", action="store_true")
     parser.add_argument("--stereo", action="store_true")
-
+    parser.add_argument("--stride", default=2, type=int, help="skip number of images")
     parser.add_argument("--beta", type=float, default=0.3)
     parser.add_argument("--filter_thresh", type=float, default=2.4)
     parser.add_argument("--warmup", type=int, default=15)
     parser.add_argument("--keyframe_thresh", type=float, default=3.5)
     parser.add_argument("--frontend_thresh", type=float, default=17.5)
-    parser.add_argument("--frontend_window", type=int, default=20)
+    parser.add_argument("--frontend_window", type=int, default=20, 
+                        help="The number of frames which will be considered for proximity")
     parser.add_argument("--frontend_radius", type=int, default=2)
     parser.add_argument("--frontend_nms", type=int, default=1)
+    parser.add_argument("--max_age",type=int, default=25, 
+                        help="The number of frames for marginalization in factor graph")
+    parser.add_argument("--max_factors", type=int, default=48, 
+                        help="max number of factors/edges in the factor graph")
 
     parser.add_argument("--backend_thresh", type=float, default=24.0)
     parser.add_argument("--backend_radius", type=int, default=2)
@@ -317,7 +322,7 @@ if __name__ == '__main__':
     time.sleep(5)
     
 
-    for (t, image, intrinsics) in tqdm(image_stream(args.datapath, stereo=args.stereo, stride=2)):
+    for (t, image, intrinsics) in tqdm(image_stream(args.datapath, stereo=args.stereo, stride=args.stride)):
         droid.track(t, image, intrinsics=intrinsics)
 
     save_reconstruction(droid, args)
