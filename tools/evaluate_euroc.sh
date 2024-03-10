@@ -1,8 +1,8 @@
 #!/bin/bash
 
 
-EUROC_PATH=/data/jagat/euroc/
-
+EUROC_PATH="/data/jagat/euroc/"
+recon_path="/data/jagat/processed/"
 evalset=(
    MH_01_easy
    MH_02_easy
@@ -17,20 +17,28 @@ evalset=(
     V2_03_difficult
 )
 
+evalset=(
+   V1_01_easy
+)
 
 for seq in ${evalset[@]}; do
-    python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --weights=droid.pth --disable_vis $@
+    python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt\
+     --weights=droid.pth --max_age=200 --stride=10 --max_factors=20000  --reconstruction_path=$recon_path $@ 
 done
 
-for seq in ${evalset[@]}; do
-    python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --weights=droid.pth --disable_vis  --global_ba $@
-done
+# for seq in ${evalset[@]}; do
+#     python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --weights=droid.pth --disable_vis --reconstruction_path=$recon_path $@
+# done
+
+# for seq in ${evalset[@]}; do
+#     python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --weights=droid.pth --disable_vis  --global_ba  --reconstruction_path=$recon_path $@
+# done
 
 
-for seq in ${evalset[@]}; do
-    python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --stereo --weights=droid.pth --disable_vis $@
-done
+# for seq in ${evalset[@]}; do
+#     python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --stereo --weights=droid.pth --disable_vis --reconstruction_path=$recon_path $@
+# done
 
-for seq in ${evalset[@]}; do
-    python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --stereo --weights=droid.pth --disable_vis --global_ba $@
-done
+# for seq in ${evalset[@]}; do
+#     python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt --stereo --weights=droid.pth --disable_vis --global_ba --reconstruction_path=$recon_path $@
+# done
