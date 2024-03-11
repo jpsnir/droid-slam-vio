@@ -124,6 +124,7 @@ class FactorGraph:
             and self.corr is not None
             and remove
         ):
+            #breakpoint()
             ix = torch.arange(len(self.age))[torch.argsort(self.age).cpu()]
             self.rm_factors(ix >= self.max_factors - ii.shape[0], store=True)
 

@@ -44,7 +44,7 @@ def imu_stream(data_path, stride):
         for t in ts:
             yield t
 
-def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1):
+def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1, max_images:int = -1):
     """ image generator """
 
     K_l = np.array([458.654, 0.0, 367.215, 0.0, 457.296, 248.375, 0.0, 0.0, 1.0]).reshape(3,3)
@@ -75,7 +75,10 @@ def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1):
     # read all png images in folder
     images_left = sorted(glob.glob(os.path.join(datapath, 'mav0/cam0/data/*.png')))[::stride]
     images_right = [x.replace('cam0', 'cam1') for x in images_left]
-
+    if max_images > 0:
+        images_left = images_left[:max_images]
+        images_right = images_right[:max_images]
+    #breakpoint()
     for t, (imgL, imgR) in enumerate(zip(images_left, images_right)):
         if stereo and not os.path.isfile(imgR):
             continue
@@ -288,6 +291,8 @@ if __name__ == '__main__':
                         help="The number of frames for marginalization in factor graph")
     parser.add_argument("--max_factors", type=int, default=48, 
                         help="max number of factors/edges in the factor graph")
+    parser.add_argument("--max_images", type=int, default=-1,
+                        help="max number of images to process")
 
     parser.add_argument("--backend_thresh", type=float, default=24.0)
     parser.add_argument("--backend_radius", type=int, default=2)
@@ -322,7 +327,8 @@ if __name__ == '__main__':
     time.sleep(5)
     
 
-    for (t, image, intrinsics) in tqdm(image_stream(args.datapath, stereo=args.stereo, stride=args.stride)):
+    for (t, image, intrinsics) in tqdm(
+         image_stream(args.datapath, stereo=args.stereo, stride=args.stride, max_images=args.max_images)):
         droid.track(t, image, intrinsics=intrinsics)
 
     save_reconstruction(droid, args)
