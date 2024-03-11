@@ -23,7 +23,7 @@ evalset=(
 
 for seq in ${evalset[@]}; do
     python evaluation_scripts/test_euroc.py --datapath=$EUROC_PATH/$seq --gt=data/euroc_groundtruth/$seq.txt\
-     --weights=droid.pth --max_age=200 --stride=10 --max_factors=20000  --reconstruction_path=$recon_path $@ 
+     --weights=droid.pth --max_age=120 --stride=2 --max_factors=20000  --max_images=400 --reconstruction_path=$recon_path $@ 
 done
 
 # for seq in ${evalset[@]}; do
