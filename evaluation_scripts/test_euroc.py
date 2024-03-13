@@ -44,7 +44,7 @@ def imu_stream(data_path, stride):
         for t in ts:
             yield t
 
-def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1, max_images:int = -1):
+def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1, start_image_name:str = None, max_images:int = -1):
     """ image generator """
 
     K_l = np.array([458.654, 0.0, 367.215, 0.0, 457.296, 248.375, 0.0, 0.0, 1.0]).reshape(3,3)
@@ -73,11 +73,25 @@ def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1, max_im
     ht0, wd0 = [480, 752]
 
     # read all png images in folder
-    images_left = sorted(glob.glob(os.path.join(datapath, 'mav0/cam0/data/*.png')))[::stride]
+    images_left = sorted(glob.glob(os.path.join(datapath, 'mav0/cam0/data/*.png')))
+    
+    if start_image_name is None:
+        start_image = 0
+        last_image = len(images_left)
+    else:
+        for id, f in enumerate(images_left):
+            filename = f.split('/')[-1]
+            if start_image_name == filename:
+                start_image = id
+                last_image = id + max_images
+                break
+    logging.info(f"First image chosen: {start_image}, max_images: {max_images}, stride - {stride}, stereo - {stereo}") 
+    time.sleep(3)
+    images_left = images_left[::stride]
     images_right = [x.replace('cam0', 'cam1') for x in images_left]
     if max_images > 0:
-        images_left = images_left[:max_images]
-        images_right = images_right[:max_images]
+        images_left = images_left[start_image:last_image]
+        images_right = images_right[start_image:last_image]
     #breakpoint()
     for t, (imgL, imgR) in enumerate(zip(images_left, images_right)):
         if stereo and not os.path.isfile(imgR):
@@ -297,6 +311,7 @@ if __name__ == '__main__':
     parser.add_argument("--backend_thresh", type=float, default=24.0)
     parser.add_argument("--backend_radius", type=int, default=2)
     parser.add_argument("--backend_nms", type=int, default=2)
+    parser.add_argument("--start_image_name", default = None, type=str, help="image start name for getting the trajectory")
     parser.add_argument("--upsample", action="store_true")
     parser.add_argument("--reconstruction_path", help="path to saved reconstruction", default=".")
     parser.add_argument("--global_ba", action="store_true", help="flag to perform global BA at the end.")
@@ -328,7 +343,8 @@ if __name__ == '__main__':
     
 
     for (t, image, intrinsics) in tqdm(
-         image_stream(args.datapath, stereo=args.stereo, stride=args.stride, max_images=args.max_images)):
+         image_stream(args.datapath, stereo=args.stereo, stride=args.stride,  
+                      start_image_name=args.start_image_name, max_images=args.max_images)):
         droid.track(t, image, intrinsics=intrinsics)
 
     save_reconstruction(droid, args)
